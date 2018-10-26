@@ -1,0 +1,452 @@
+df_train = pd.read_csv('C:/Users/sankara/Documents/Data Science/practise/Loan Prediction/datasets/train_v2.csv/train.csv')
+
+df_train.head(10)
+df_train.describe()
+df_train['Loan_Status'].value_counts()
+df_train['Property_Area'].value_counts()
+df_train['ApplicantIncome'].hist(bins=50)
+df_train.boxplot(column='ApplicantIncome')
+df_train.boxplot(colum='ApplicantIncome', by='Education')
+df_train.boxplot(column='Applicantincome', by='Property_Area')
+df_train.boxplot(column='ApplicantIncome', by = 'Gender')
+df_train.boxplot(column='LoanAmount')
+df_train['LoanAmount'].hist(bins=50)
+
+
+temp1 = df['Credit_History'].value_counts(ascending=True)
+temp2 = df.pivot_table(values='Loan_Status',index=['Credit_History'],aggfunc=lambda x: x.map({'Y':1,'N':0}).mean())
+print 'Frequency Table for Credit History:' 
+print temp1
+
+print '\nProbility of getting loan for each Credit History class:' 
+print temp2
+
+temp4 = df_train.pivot_table(values='Gender', index=['Credit_History'], aggfunc=lambda x: x.map
+({'Male':1, 'Female':0}).mean())
+
+temp3 = df_train.pivot_table(values='Married', index=['Credit_History'], aggfunc=lambda x: x.map
+({'Yes':1, 'No':0}).mean())
+
+import matplotlib.pyplot as plt
+fig = plt.figure(figsize=(8,4))
+ax1 = fig.add_subplot(121)
+ax1.set_xlabel('Credit_History')
+ax1.set_ylabel('Count of Applicants')
+ax1.set_title("Applicants by Credit_History")
+temp1.plot(kind='bar')
+
+ax2 = fig.add_subplot(122)
+ax2.set_xlabel('Credit_History')
+ax2.set_ylabel('Probability of getting loan')
+ax2.set_title("Probability of getting loan by credit history")
+temp2.plot(kind = 'bar')
+
+
+fig = plt.figure(figsize=(8,4))
+ax1 = fig.add_subplot(121)
+ax1.set_xlabel('Married')
+ax1.set_ylabel('Probability of getting a loan')
+temp3.plot(kind = 'bar')
+
+
+fig = plt.figure(figsize=(8,4))
+ax1 = fig.add_subplot(121)
+ax1.set_xlabel('Gender')
+ax1.set_ylabel('Probability of getting a loan')
+temp4.plot(kind = 'bar')
+
+#Alternately, these two plots can also be visualized by combining them in a stacked chart::
+
+cross_stacked = pd.crosstab(index=[df_train['Credit_History'], df_train['Gender']], 
+                             columns=[df_train['Loan_Status']],
+                             margins=True)
+                             
+cross_stacked.plot(kind='bar', stacked=True, color=['red', 'blue'], grid=False)
+
+
+app_income = pd.crosstab(index=[df_train['ApplicantIncome']], 
+                             columns=[df_train['Loan_Status']],
+                             margins=True)
+
+#Handling Missing values
+
+df_train['LoanAmount'].fillna(df_train['LoanAmount'].mean(), inplace=True)
+
+#Handling Self_Employed
+df_train['Self_Employed'].fillna('No',inplace=True)
+
+
+#Handling Gender
+df_train['Gender'].fillna('Male', inplace=True)
+
+#Handling Married
+df_train['Married'].fillna('Yes', inplace=True)
+
+
+#Handling Dependents
+df_train['Dependents'].fillna('0', inplace=True)
+
+#Handling Loan_Amount_Term
+df_train['Loan_Amount_Term'].fillna('360.0',inplace=True)
+
+#Handling Credit_History
+df_train['Credit_History'].fillna('1',inplace=True)
+
+
+
+
+
+
+
+
+
+
+ 
+table = df_train.pivot_table(values='LoanAmount', index='Self_Employed' ,columns='Education', aggfunc=np.median)
+ 
+table = df.pivot_table(values='LoanAmount', index='Self_Employed' ,columns='Education', aggfunc=np.median)
+
+# Define function to return value of this pivot_table
+def fage(x):
+ return table.loc[x['Self_Employed'],x['Education']]
+# Replace missing values
+df['LoanAmount'].fillna(df[df['LoanAmount'].isnull()].apply(fage, axis=1), inplace=True)
+
+ df['LoanAmount_log'] = np.log(df['LoanAmount'])
+df['LoanAmount_log'].hist(bins=20)
+
+df['TotalIncome'] = df['ApplicantIncome'] + df['CoapplicantIncome']
+df['TotalIncome_log'] = np.log(df['TotalIncome'])
+df['LoanAmount_log'].hist(bins=20) 
+
+
+#Filled in missing gender values with Male
+df_train['Gender'].fillna('Male',inplace=True)
+
+#Filled in missing Married values with Yes
+df_train['Married'].fillna('Yes',inplace=True)
+
+#Filled in missing Dependents values with 0
+df_train['Dependents'].fillna(0, inplace=True)
+
+#Filled in missing Loan_Amount_Term values with 360
+df_train['Loan_Amount_Term'].fillna(360, inplace=True)
+
+#Filled in missing Credit_History values with 1
+df_train['Credit_History'].fillna(1, inplace=True)
+
+#For example, creating a column for LoanAmount/TotalIncome might make sense as it gives an idea of how well the applicant is suited to pay back his loan.
+df_train['Loan_ttlIncome'] = df_train['LoanAmount'] / df_train['TotalIncome']
+
+#LabelEncoding
+from sklearn.preprocessing import LabelEncoder
+var_mod = ['Gender','Married','Dependents','Education','Self_Employed','Property_Area','Loan_Status']
+le = LabelEncoder()
+ for i in var_mod:
+    df_train[i] = le.fit_transform(df_train[i])
+	
+df_train.dtypes 
+
+
+
+
+
+
+#Import models from scikit learn module:
+from sklearn.linear_model import LogisticRegression
+from sklearn.cross_validation import KFold   #For K-fold cross validation
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn import metrics
+
+
+#Generic function for making a classification model and accessing performance:
+def classification_model(model, data, predictors, outcome):
+  #Fit the model:
+  model.fit(data[predictors],data[outcome])
+  
+  #Make predictions on training set:
+  predictions = model.predict(data[predictors])
+  
+  #Print accuracy
+  accuracy = metrics.accuracy_score(predictions,data[outcome])
+  print ("Accuracy : %s" % "{0:.3%}".format(accuracy))
+
+  #Perform k-fold cross-validation with 5 folds
+  kf = KFold(data.shape[0], n_folds=5)
+  error = []
+  for train, test in kf:
+    # Filter training data
+    train_predictors = (data[predictors].iloc[train,:])
+    
+    # The target we're using to train the algorithm.
+    train_target = data[outcome].iloc[train]
+    
+    # Training the algorithm using the predictors and target.
+    model.fit(train_predictors, train_target)
+    
+    #Record error from each cross-validation run
+    error.append(model.score(data[predictors].iloc[test,:], data[outcome].iloc[test]))
+ 
+  print ("Cross-Validation Score : %s" % "{0:.3%}".format(np.mean(error)))
+
+  #Fit the model again so that it can be refered outside the function:
+  model.fit(data[predictors],data[outcome]) 
+  
+
+
+  
+#The various algorithms
+
+
+outcome_var = 'Loan_Status'
+model = LogisticRegression()
+predictor_var = ['Credit_History']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 80.945%
+Cross-Validation Score : 80.946%
+
+
+#With Median
+outcome_var = 'Loan_Status'
+model = LogisticRegression()
+predictor_var = ['Credit_History']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 80.945%
+Cross-Validation Score : 80.946%
+
+
+#With deletion of all rows with missing values
+outcome_var = 'Loan_Status'
+model = LogisticRegression()
+predictor_var = ['Credit_History']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 80.833%
+Cross-Validation Score : 80.833%
+
+
+
+
+model = DecisionTreeClassifier()
+predictor_var = ['Credit_History','Gender','Married','Education']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 80.945%
+Cross-Validation Score : 80.946%
+
+#With Median 
+model = DecisionTreeClassifier()
+predictor_var = ['Credit_History','Gender','Married','Education']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 80.945%
+Cross-Validation Score : 80.946%
+
+#With deletion of all rows with missing values
+model = DecisionTreeClassifier()
+predictor_var = ['Credit_History','Gender','Married','Education']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 80.833%
+Cross-Validation Score : 80.833%
+
+
+#We can try different combination of variables:
+predictor_var = ['Credit_History','Loan_Amount_Term','LoanAmount_log']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 89.414%
+Cross-Validation Score : 68.397%
+
+#With Median 
+#We can try different combination of variables:
+predictor_var = ['Credit_History','Loan_Amount_Term']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 81.270%
+Cross-Validation Score : 80.295%
+
+
+#With Deletion
+predictor_var = ['Credit_History','Loan_Amount_Term']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 81.458%
+Cross-Validation Score : 81.250%
+
+
+#With Mode 
+
+#We can try different combination of variables:
+predictor_var = ['Credit_History','Loan_Amount_Term']
+classification_model(model, df_train,predictor_var,outcome_var)
+
+Accuracy : 81.270%
+Cross-Validation Score : 80.295%
+
+
+
+
+#With Mean()
+model = RandomForestClassifier(n_estimators=100)
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area',
+        'LoanAmount_log']
+classification_model(model, df_train,predictor_var,outcome_var)
+        
+Accuracy : 98.697%
+Cross-Validation Score : 75.732%
+
+
+#With Mode
+model = RandomForestClassifier(n_estimators=100)
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+Accuracy : 86.156%
+Cross-Validation Score : 77.366%
+
+
+#With Deletion 
+
+model = RandomForestClassifier(n_estimators=100)
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 86.667%
+Cross-Validation Score : 76.667%
+
+
+#With Median
+
+model = RandomForestClassifier(n_estimators=100)
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 86.156%
+Cross-Validation Score : 77.692%
+
+
+#Varied other predictors as below
+#Handling Self_Employed
+df_train['Self_Employed'].fillna('Yes',inplace=True)
+
+
+#Handling Gender
+df_train['Gender'].fillna('Female', inplace=True)
+
+#Handling Married
+df_train['Married'].fillna('No', inplace=True)
+
+
+#Handling Dependents
+df_train['Dependents'].fillna('3', inplace=True)
+
+#Handling Loan_Amount_Term
+df_train['Loan_Amount_Term'].fillna('360.0',inplace=True)
+
+#Handling Credit_History
+df_train['Credit_History'].fillna('1',inplace=True)
+
+model = RandomForestClassifier(n_estimators=100)
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 86.645%
+Cross-Validation Score : 78.011%
+
+
+
+
+
+#With Mean()
+model = GaussianNB()
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 80.945%
+Cross-Validation Score : 80.784%
+
+
+#With Median
+model = GaussianNB()
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 80.945%
+Cross-Validation Score : 80.784%
+
+
+#With Deletion
+model = GaussianNB()
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 80.833%
+Cross-Validation Score : 80.000%
+
+
+#With Mode
+model = GaussianNB()
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 80.945%
+Cross-Validation Score : 80.784%
+
+#With Mean on Loan Amount but with mode on another field ()
+model = GaussianNB()
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 80.945%
+Cross-Validation Score : 80.784%
+
+
+
+Varied other predictors as below
+#Handling Self_Employed
+df_train['Self_Employed'].fillna('Yes',inplace=True)
+
+
+#Handling Gender
+df_train['Gender'].fillna('Female', inplace=True)
+
+#Handling Married
+df_train['Married'].fillna('No', inplace=True)
+
+
+#Handling Dependents
+df_train['Dependents'].fillna('3', inplace=True)
+
+#Handling Loan_Amount_Term
+df_train['Loan_Amount_Term'].fillna('360.0',inplace=True)
+
+#Handling Credit_History
+df_train['Credit_History'].fillna('1',inplace=True)
+
+
+
+#With Mean and Varied Values in another column
+model = GaussianNB()
+predictor_var = ['Gender', 'Married', 'Dependents', 'Education',
+       'Self_Employed', 'Loan_Amount_Term', 'Credit_History', 'Property_Area']   
+classification_model(model, df_train,predictor_var,outcome_var)
+       
+Accuracy : 80.945%
+Cross-Validation Score : 80.784%
+
+
+
